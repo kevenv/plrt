@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset=utf-8>
+		<title>Precomputed Radiance Transfert (PRT)</title>
+		<style>
+			body { margin: 10; }
+
+			#viewport {
+				width: 800px; height: 600px;
+				float: left;
+			}
+
+			#ui {
+				float: right;
+			}
+
+			label {
+				display: inline-block;
+				width: 100px;
+				text-align: left;
+			}​
+		</style>
+	</head>
+	<body>
+		<form id="ui">
+			<div class="block">
+				<label>Light intensity</label>
+				<input type="range" id="slider_L_intensity">
+				<input type="text" id="text_L_intensity">
+			</div>
+			<div class="block">
+				<label>Light direction</label>
+				<input type="range" id="slider_L_direction">
+				<input type="text" id="text_L_direction">
+			</div>
+			<div class="block">
+				<label>Light radius (r)</label>
+				<input type="range" id="slider_L_r">
+				<input type="text" id="text_L_r">
+			</div>
+			<div class="block">
+				<label>Light distance (d)</label>
+				<input type="range" id="slider_L_d">
+				<input type="text" id="text_L_d">
+			</div>
+			<div class="block">
+				<input type="button" value="Load model" id="button_loadModel">
+				<input type="file" id="file_loadModel">
+			</div>
+			<div class="block">
+				<label>Montecarlo samples</label>
+				<input type="range" id="slider_montecarlo">
+				<input type="text" id="text_montecarlo">
+			</div>
+			<div class="block">
+				<label>SH order</label>
+				<input type="range" id="slider_order">
+				<input type="text" id="text_order">
+			</div>
+			<div class="block">
+				<input type="button" value="Compute PRT" id="button_computePRT">
+			</div>
+			<div class="block">
+				<input type="text" id="text_savePRT">
+				<input type="button" value="Save PRT" id="button_savePRT">
+			</div>
+			<div class="block">
+				<input type="button" value="Load PRT" id="button_loadPRT">
+				<input type="file" id="file_loadPRT">
+			</div>
+		</form>
+
+		<div id="viewport"></div>
+		
+		<script src="libs/three.js"></script>
+		<script src="libs/OBJLoader.js"></script>
+		<script src="libs/OrbitControls.js"></script>
+		<script src="libs/bvhtree.js"></script>
+		<script src="src/sh.js"></script>
+		<script src="src/main.js"></script>
+	</body>
+</html>
