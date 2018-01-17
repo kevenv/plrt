@@ -8,4 +8,4 @@ Precomputed Local Radiance Transfer for Real-Time Lighting Design.
 http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.87.8865&rep=rep1&type=pdf
 
 ## Usage
-Run using: python -m SimpleHTTPServer 8000
+Run using: `python -m SimpleHTTPServer 8000`
