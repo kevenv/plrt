@@ -1,10 +1,10 @@
 /*
-	Precomputed Radiance Transfert (PRT)
+	Precomputed Local Radiance Transfert (PLRT)
 
 	Demo for the computer graphics paper discussion group at McGill University.
 	Based on:
-			Precomputed Radiance Transfer for Real-Time Rendering in Dynamic, Low-Frequency Lighting Environments
-	        http://www.ppsloan.org/publications/shillum_final23.pdf
+			Based on: Precomputed Local Radiance Transfer for Real-Time Lighting Design.
+			http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.87.8865&rep=rep1&type=pdf
 
 	by Keven Villeneuve
 */
@@ -12,8 +12,8 @@
 'use strict'
 
 // Constants
-var WINDOW_WIDTH = 800;
-var WINDOW_HEIGHT = 600;
+var WINDOW_WIDTH = 768/2;
+var WINDOW_HEIGHT = 768/2;
 var ALBEDO = new Array(2);
 ALBEDO[0] = new THREE.Vector3(1,0,0);
 ALBEDO[1] = new THREE.Vector3(1,1,1);
@@ -63,20 +63,22 @@ function onRender() {
 function onInit() {
 	renderer = new THREE.WebGLRenderer();
 	renderer.setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+	renderer.shadowMap.enabled = true;
+	renderer.shadowMap.type = THREE.BasicShadowMap;
 	var viewport = document.getElementById("viewport");
 	viewport.appendChild(renderer.domElement);
 
 	scene = new THREE.Scene();
-	camera = new THREE.PerspectiveCamera(50, WINDOW_WIDTH/WINDOW_HEIGHT, 0.1, 1000);
+
 	// camera
+	camera = new THREE.PerspectiveCamera(37, WINDOW_WIDTH/WINDOW_HEIGHT, 0.1, 1000);
 	camera.up.set(0,0,1);
-	camera.position.x = 7.54;
-	camera.position.y = 3.77;
-	camera.position.z = 7.54;
-	camera.lookAt(new THREE.Vector3(0,0,0));
+	camera.position.set(0,-4,1);
+	camera.lookAt(new THREE.Vector3(0,0,1));
 
 	// controls
 	controls = new THREE.OrbitControls(camera, renderer.domElement);
+	controls.target.set(0,0,1);
 
 	// 3D-axis
 	var K = 10;
@@ -99,6 +101,7 @@ function onInit() {
 	var lineZ = new THREE.Line(geometryZ, matZ);
 	scene.add(lineZ);
 
+	/*
 	// shader
 	basicShader = createShader();
 
@@ -107,9 +110,77 @@ function onInit() {
 	plane = new THREE.Mesh(geometry, basicShader);
 	createColorAttrib(plane, new THREE.Vector3(0.0,1.0,0.0));
 	scene.add(plane);
+	*/
+
+	loadcbox();
 
 	onRender();
 }
+
+function loadcbox() {
+	var CBOX_FILE_PATH = "http://localhost:8000/assets/cbox/";
+	var cbox_parts = ["cbox_walls","cbox_lwall","cbox_rwall","cbox_bigbox","cbox_smallbox"];
+
+	var loader = new THREE.OBJLoader();
+
+	asyncLoop({
+		length : cbox_parts.length,
+		functionToLoop : function(loop, i) {
+			var filename = CBOX_FILE_PATH + cbox_parts[i] + ".obj";
+			loader.load(filename, function(object) {
+				var model = object.children[0];
+				objects.push(model);
+				scene.add(model);
+				console.log("loaded " + filename);
+				loop();
+			});
+		},
+		callback : function() {
+			console.log("add cbox");
+			addcbox();
+		}
+	});
+}
+
+function addcbox() {
+	//objects[0].material = new THREE.MeshBasicMaterial( {color: new THREE.Color(0.725,0.71,0.68)} );
+	objects[0].material = new THREE.MeshBasicMaterial( {color: new THREE.Color(1,0,1)} );
+	objects[1].material = new THREE.MeshBasicMaterial( {color: new THREE.Color(0.63,0.065,0.05)} );
+	objects[2].material = new THREE.MeshBasicMaterial( {color: new THREE.Color(0.14,0.45,0.091)} );
+	objects[3].material = new THREE.MeshBasicMaterial( {color: new THREE.Color(0.725,0.71,0.68)} );
+	objects[4].material = new THREE.MeshBasicMaterial( {color: new THREE.Color(0.725,0.71,0.68)} );
+}
+
+function onUpdate() {
+	controls.update();
+	return;
+
+	if(!PRTCacheGood) return;
+
+	for(var j = 0; j < objects.length; j++) {
+		var obj = objects[j];
+		var G = PRTCache[j];
+		var verts = obj.geometry.getAttribute("mycolor");
+		for(var v = 0; v < verts.count; v++) {
+			verts.array[v*3+0] = 0.0;
+			verts.array[v*3+1] = 0.0;
+			verts.array[v*3+2] = 0.0;
+			for(var i = 0; i < N_COEFFS; i++) {
+				var k = L_INTENSITY * L[i] * G[v][i];
+				k = Math.max(0.0,k);
+				k = Math.min(1.0,k);
+				verts.array[v*3+0] += k * ALBEDO[j].x;
+				verts.array[v*3+1] += k * ALBEDO[j].y;
+				verts.array[v*3+2] += k * ALBEDO[j].z;
+			}
+		}
+
+		verts.needsUpdate = true;
+	}
+}
+
+
+// PRT
 
 function loadModel() {
 	if(loadedModel) {
@@ -120,7 +191,7 @@ function loadModel() {
 	}
 
 	var loader = new THREE.OBJLoader();
-	loader.load("assets/" + MODEL_FILE_NAME, function(object) {
+	loader.load("http://localhost:8000/assets/" + MODEL_FILE_NAME, function(object) {
 		var model = object.children[0];
 
 		// shader
@@ -407,208 +478,3 @@ function computeL0_env_proj_Order5(r, d) {
 
 	return L0;
 }
-
-function onUpdate() {	
-	controls.update();
-
-	if(!PRTCacheGood) return;
-
-	for(var j = 0; j < objects.length; j++) {
-		var obj = objects[j];
-		var G = PRTCache[j];
-		var verts = obj.geometry.getAttribute("mycolor");
-		for(var v = 0; v < verts.count; v++) {
-			verts.array[v*3+0] = 0.0;
-			verts.array[v*3+1] = 0.0;
-			verts.array[v*3+2] = 0.0;
-			for(var i = 0; i < N_COEFFS; i++) {
-				var k = L_INTENSITY * L[i] * G[v][i];
-				k = Math.max(0.0,k);
-				k = Math.min(1.0,k);
-				verts.array[v*3+0] += k * ALBEDO[j].x;
-				verts.array[v*3+1] += k * ALBEDO[j].y;
-				verts.array[v*3+2] += k * ALBEDO[j].z;
-			}
-		}
-
-		verts.needsUpdate = true;
-	}
-}
-
-// JSON file read/write
-function writeJson(object, name, type) {
-	var text = JSON.stringify(object);
-	var a = document.createElement("a");
-	var file = new Blob([text], {type: type});
-	a.href = URL.createObjectURL(file);
-	a.download = name;
-	a.click();
-}
-
-function readJson(file, callback) {
-    var rawFile = new XMLHttpRequest();
-    rawFile.overrideMimeType("application/json");
-    rawFile.open("GET", file, true);
-    rawFile.onreadystatechange = function() {
-        if (rawFile.readyState === 4) {
-            var data = JSON.parse(rawFile.responseText);
-            callback(data);
-        }
-    }
-    rawFile.send(null);
-}
-
-function initControls() {
-	var text_L_intensity = document.getElementById("text_L_intensity");
-	text_L_intensity.value = L_INTENSITY;
-
-	var text_L_direction = document.getElementById("text_L_direction");
-	text_L_direction.value = L_ANGLE;
-	L_DIR = computeLightDir(L_ANGLE);
-
-	var text_L_r = document.getElementById("text_L_r");
-	text_L_r.value = L_r;
-
-	var text_L_d = document.getElementById("text_L_d");
-	text_L_d.value = L_d;
-
-	var text_montecarlo = document.getElementById("text_montecarlo");
-	text_montecarlo.value = N_MONTE_CARLO;
-
-	var text_order = document.getElementById("text_order");
-	text_order.value = N_ORDER;
-
-	var text_savePRT = document.getElementById("text_savePRT");
-	text_savePRT.value = PRECOMPUTE_FILE_NAME;
-
-	var sliderIntensity = document.getElementById("slider_L_intensity");
-	sliderIntensity.defaultValue = L_INTENSITY;
-	sliderIntensity.min = 0.0;
-	sliderIntensity.max = 3.0;
-	sliderIntensity.step = 0.1;
-	sliderIntensity.addEventListener("input", function() {
-		L_INTENSITY = parseFloat(sliderIntensity.value);
-		var text_L_intensity = document.getElementById("text_L_intensity");
-		text_L_intensity.value = L_INTENSITY;
-	});
-
-	var sliderDirection = document.getElementById("slider_L_direction");
-	sliderDirection.defaultValue = L_ANGLE;
-	sliderDirection.min = 0.0;
-	sliderDirection.max = 180.0;
-	sliderDirection.step = 5.0;
-	sliderDirection.addEventListener("input", function() {
-		L_ANGLE = parseFloat(sliderDirection.value);
-		var text_L_direction = document.getElementById("text_L_direction");
-		text_L_direction.value = L_ANGLE;
-		L_DIR = computeLightDir(L_ANGLE);
-		precomputeL();
-	});
-
-	var sliderL_r = document.getElementById("slider_L_r");
-	sliderL_r.defaultValue = L_r;
-	sliderL_r.min = 0.0;
-	sliderL_r.max = 3.0;
-	sliderL_r.step = 0.1;
-	sliderL_r.addEventListener("input", function() {
-		L_r = parseFloat(sliderL_r.value);
-		var text_L_r = document.getElementById("text_L_r");
-		text_L_r.value = L_r;
-		precomputeL();
-	});
-
-	var sliderL_d = document.getElementById("slider_L_d");
-	sliderL_d.defaultValue = L_d;
-	sliderL_d.min = 0.0;
-	sliderL_d.max = 3.0;
-	sliderL_d.step = 0.1;
-	sliderL_d.addEventListener("input", function() {
-		L_d = parseFloat(sliderL_d.value);
-		var text_L_d = document.getElementById("text_L_d");
-		text_L_d.value = L_d;
-		precomputeL();
-	});
-
-	var button_loadModel = document.getElementById("button_loadModel");
-	button_loadModel.addEventListener("click", function() {
-		var file_loadModel = document.getElementById("file_loadModel");
-		MODEL_FILE_NAME = file_loadModel.value.substring(12,file_loadModel.value.length);
-		loadModel();
-	});
-
-	var slider_montecarlo = document.getElementById("slider_montecarlo");
-	slider_montecarlo.defaultValue = N_MONTE_CARLO;
-	slider_montecarlo.min = 0;
-	slider_montecarlo.max = 1000;
-	slider_montecarlo.step = 100;
-	slider_montecarlo.addEventListener("input", function() {
-		N_MONTE_CARLO = parseFloat(slider_montecarlo.value);
-		var text_montecarlo = document.getElementById("text_montecarlo");
-		text_montecarlo.value = N_MONTE_CARLO;
-	});
-
-	text_montecarlo.addEventListener("change", function() {
-		N_MONTE_CARLO = parseFloat(text_montecarlo.value);
-		slider_montecarlo.value = N_MONTE_CARLO;
-	});
-
-	var slider_order = document.getElementById("slider_order");
-	slider_order.defaultValue = N_ORDER;
-	slider_order.min = 3;
-	slider_order.max = 5;
-	slider_order.step = 1;
-	slider_order.addEventListener("input", function() {
-		N_ORDER = parseFloat(slider_order.value);
-		N_COEFFS = N_ORDER*N_ORDER;
-		var text_order = document.getElementById("text_order");
-		text_order.value = N_ORDER;
-	});
-
-	text_order.addEventListener("change", function() {
-		N_ORDER = parseFloat(text_order.value);
-		N_COEFFS = N_ORDER*N_ORDER;
-		slider_order.value = N_ORDER;
-	});
-
-	var button_computePRT = document.getElementById("button_computePRT");
-	button_computePRT.addEventListener("click", function() {
-		precomputeL();
-		precomputeG(false);
-	});
-
-	var button_savePRT = document.getElementById("button_savePRT");
-	button_savePRT.addEventListener("click", function() {
-		var text_savePRT = document.getElementById("text_savePRT");
-		PRECOMPUTE_FILE_NAME = text_savePRT.value;
-		if(PRTCacheGood) {
-			writeJson(PRTCache, PRECOMPUTE_FILE_NAME, 'text/plain');
-		}
-	});
-
-	var button_loadPRT = document.getElementById("button_loadPRT");
-	button_loadPRT.addEventListener("click", function() {
-		var file_loadPRT = document.getElementById("file_loadPRT");
-		PRECOMPUTE_FILE_NAME = file_loadPRT.value.substring(12,file_loadPRT.value.length);
-
-		var text_savePRT = document.getElementById("text_savePRT");
-		text_savePRT.value = PRECOMPUTE_FILE_NAME;
-		
-		var loc = window.location.pathname;
-		var dir = loc.substring(0, loc.lastIndexOf('/'));
-		PRECOMPUTE_FILE_PATH = dir + "/" + PRECOMPUTE_FILE_NAME;
-		precomputeL();
-		precomputeG(true);
-	});
-}
-
-function computeLightDir(angleDeg) {
-	var v = new THREE.Vector3(0,1,0); // at 0 deg
-	var rotMat = new THREE.Matrix4();
-	rotMat.makeRotationX(toRadians(angleDeg));
-	v.applyMatrix4(rotMat);
-	return v;
-}
-
-function toRadians(deg) {
-	return deg * Math.PI / 180;
-};
