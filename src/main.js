@@ -9,22 +9,22 @@
 	by Keven Villeneuve
 */
 
-'use strict'
+'use strict';
 
 // Constants
 var WINDOW_WIDTH = 768/2;
 var WINDOW_HEIGHT = 768/2;
 
-var N_PROBES = 5;
+var N_PROBES = 4;
 var SEARCH_RADIUS = 0.8;
-var LIGHT_POWER = 1.0;
-var N_ORDER = 2;
-var N_COEFFS = N_ORDER*N_ORDER; //todo: make sure this is right
+var LIGHT_POWER = 3.4;
+var N_ORDER = 3;
+var N_COEFFS = N_ORDER*N_ORDER;
 
-var N_MONTE_CARLO = 100;
-var N_SAMPLES_SH = 50;
+var N_MONTE_CARLO = 50;
+var N_SAMPLES_SH = 100;
 var RAY_OFFSET = 1e-18;
-var MONTE_CARLO_MAX_BOUNCES = 2;
+var MONTE_CARLO_MAX_BOUNCES = 3;
 
 // Globals
 var scene = null;
@@ -49,7 +49,7 @@ var basicShader = null;
 var probeMaterial = new THREE.MeshBasicMaterial( {color: 0x0000ff} );
 var probeUnselectedMaterial = new THREE.MeshBasicMaterial( {color: 0x000088} );
 
-var cbox_colors = [new THREE.Vector3(1,1,1),new THREE.Vector3(1,1,1),];
+var cbox_colors = [new THREE.Color(1,1,1),new THREE.Color(1,1,1)];
 
 // Events
 document.addEventListener("load", onLoad());
@@ -87,8 +87,8 @@ function onInit() {
 	// shader
 	basicShader = createShader();
 
-	onMeshLoad();
-	//onAfterLoad();
+	//onMeshLoad();
+	onAfterLoad();
 }
 
 function onMeshLoad() {
@@ -103,6 +103,7 @@ function onAfterLoad() {
 	//addTestPlane();
 	//addTestProbe();
 	//addTestOccluder();
+	addCbox();
 
 	buildBVH(objects);
 	//computeBasisSH();
@@ -115,9 +116,9 @@ function addLight() {
 	var geometry = new THREE.SphereGeometry(0.2, 32, 32);
 	var material = new THREE.MeshBasicMaterial( {color: 0xff0000} );
 	light = new THREE.Mesh(geometry, material);
-	light.position.z = 0.4;
-	//light.position.z = 1.6;
-	//light.position.x = -0.3;
+	//light.position.z = 1.4;
+	light.position.z = 1.6;
+	light.position.x = -0.3;
 	scene.add(light);
 }
 
@@ -130,7 +131,7 @@ function addProbe(x,y,z) {
 		"mesh": probe, 
 		"position": probe.position
 	});
-	scene.add(probe);
+	//scene.add(probe);
 }
 
 function addProbes() {
@@ -139,18 +140,104 @@ function addProbes() {
 	var Z_W = N_PROBES;
 	N_PROBES = X_W*Y_W*Z_W;
 	var PROBE_SPACING = 0.5;
-	var OFFSET_X = -1;
-	var OFFSET_Y = -1;
+	var OFFSET_X = -0.8;
+	var OFFSET_Y = -0.8;
 	var OFFSET_Z = 0.2;
 	for(var x = 0; x < X_W; x++) {
 		for(var y = 0; y < Y_W; y++) {
 			for(var z = 0; z < Z_W; z++) {
-				addProbe(OFFSET_X+x*PROBE_SPACING,OFFSET_Y+y*PROBE_SPACING,OFFSET_Z+z*PROBE_SPACING)
+				addProbe(OFFSET_X+x*PROBE_SPACING,OFFSET_Y+y*PROBE_SPACING,OFFSET_Z+z*PROBE_SPACING);
 			}
 		}
 	}
 
 	weights = new Array(N_PROBES);
+}
+
+function addCbox() {
+	// BOTTOM
+	var wallBottomG = new THREE.PlaneBufferGeometry(2, 2, 10, 10);
+	var wallBottom = new THREE.Mesh(wallBottomG, basicShader);
+	createColorAttrib(wallBottom, new THREE.Vector3(1.0,1.0,1.0));
+	objects.push(wallBottom);
+	scene.add(wallBottom);
+	
+	// TOP
+	var wallTopG = new THREE.PlaneBufferGeometry(2, 2, 10, 10);
+	var wallTop = new THREE.Mesh(wallTopG, basicShader);
+	wallTop.rotation.y = toRadians(-180);
+	wallTop.position.z = 2;
+	createColorAttrib(wallTop, new THREE.Vector3(1.0,1.0,1.0));
+	objects.push(wallTop);
+	scene.add(wallTop);
+	
+	// LEFT
+	var wallLeftG = new THREE.PlaneBufferGeometry(2, 2, 10, 10); //need to have it's own geometry because vertex colors can't be shared
+	var wallLeft = new THREE.Mesh(wallLeftG, basicShader);
+	wallLeft.rotation.y = toRadians(90);
+	wallLeft.position.x = -1;
+	wallLeft.position.z = 1;
+	createColorAttrib(wallLeft, new THREE.Vector3(1.0,1.0,1.0));
+	objects.push(wallLeft);
+	scene.add(wallLeft);
+
+	// RIGHT
+	var wallRightG = new THREE.PlaneBufferGeometry(2, 2, 10, 10);
+	var wallRight = new THREE.Mesh(wallRightG, basicShader);
+	wallRight.rotation.y = toRadians(-90);
+	wallRight.position.x = 1;
+	wallRight.position.z = 1;
+	createColorAttrib(wallRight, new THREE.Vector3(1.0,1.0,1.0));
+	objects.push(wallRight);
+	scene.add(wallRight);
+
+	// BACK
+	var wallBackG = new THREE.PlaneBufferGeometry(2, 2, 10, 10);
+	var wallBack = new THREE.Mesh(wallBackG, basicShader);
+	wallBack.rotation.x = toRadians(90);
+	wallBack.position.z = 1;
+	wallBack.position.y = 1;
+	createColorAttrib(wallBack, new THREE.Vector3(1.0,1.0,1.0));
+	objects.push(wallBack);
+	scene.add(wallBack);
+
+	// BIG BOX
+	var bigBoxG = new THREE.BoxBufferGeometry(1, 1, 1, 2,2,2);
+	var bigbox = new THREE.Mesh(bigBoxG, basicShader);
+	bigbox.scale.z = 1.3;
+	bigbox.scale.x = 0.6;
+	bigbox.scale.y = 0.6;
+	bigbox.position.z = 1.3/2;
+	bigbox.position.y = 0.4;
+	bigbox.position.x = -0.3;
+	bigbox.rotation.z = toRadians(25);
+	createColorAttrib(bigbox, new THREE.Vector3(1.0,1.0,1.0));
+	objects.push(bigbox);
+	scene.add(bigbox);
+
+	// SMALL BOX
+	var smallBoxG = new THREE.BoxBufferGeometry(1, 1, 1, 2,2,2);
+	var smallbox = new THREE.Mesh(smallBoxG, basicShader);
+	smallbox.scale.z = 0.7;
+	smallbox.scale.x = 0.7;
+	smallbox.scale.y = 0.7;
+	smallbox.position.z = 0.7/2;
+	smallbox.position.y = -0.3;
+	smallbox.position.x = 0.4;
+	smallbox.rotation.z = toRadians(-20);
+	createColorAttrib(smallbox, new THREE.Vector3(1.0,1.0,1.0));
+	objects.push(smallbox);
+	scene.add(smallbox);
+
+	cbox_colors = [
+		new THREE.Color(0.725,0.71,0.68), //bottom
+		new THREE.Color(0.725,0.71,0.68), //top
+		new THREE.Color(0.63,0.065,0.05), //L
+		new THREE.Color(0.14,0.45,0.091), //R
+		new THREE.Color(0.725,0.71,0.68), //back
+		new THREE.Color(0.725,0.71,0.68), //big
+		new THREE.Color(0.725,0.71,0.68)  //small
+	];
 }
 
 function loadCbox() {
@@ -206,7 +293,7 @@ function addTestProbe() {
 	var x=2;
 	var y=2;
 	var z=2;
-	addProbe(OFFSET_X+x*PROBE_SPACING,OFFSET_Y+y*PROBE_SPACING,OFFSET_Z+z*PROBE_SPACING)
+	addProbe(OFFSET_X+x*PROBE_SPACING,OFFSET_Y+y*PROBE_SPACING,OFFSET_Z+z*PROBE_SPACING);
 }
 
 function addTestOccluder() {
@@ -298,72 +385,85 @@ function createColorAttrib(mesh, color) {
 	mesh.geometry.addAttribute("mycolor", new THREE.BufferAttribute(colors, 3));
 }
 
-
-
-function computeBasisSH() {
-	// create SH samples
-	basisSH = new Array(N_SAMPLES_SH);
-	for(var m = 0; m < N_SAMPLES_SH; m++) {
-		basisSH[m] = new Array(N_COEFFS);
-
-		// sample direction
-		var sample = new THREE.Vector2(Math.random(), Math.random());
-		var w = squareToUniformSphere(sample);
-		var pdf = 1.0 / (4.0 * Math.PI);
-		var yi = SHEval(w.x, w.y, w.z, N_ORDER);
-		for(var i = 0; i < N_COEFFS; i++) {
-			basisSH[m][i] = yi[i] / (N_SAMPLES_SH * pdf);
-		}
-	}
-}
-
 function computeProbes() {
 	console.log("compute probes...");
 
 	for(var j = 0; j < objects.length; j++) {
 		var obj = objects[j];
-		var XObj = new Array(N_VERTS); // X matrix / vertex
 
 		var verts = obj.geometry.getAttribute("position");
 		var normals = obj.geometry.getAttribute("normal");
 		var N_VERTS = verts.count;
+		verts = verts.array;
+		normals = normals.array;
+
+		var XObj = new Array(N_VERTS); // X matrix / vertex
 
 		for(var v = 0; v < N_VERTS; v++) {
-			
-			//alloc X
-			var X = new Array(N_COEFFS);
-			for(var i = 0; i < N_COEFFS; i++) {
-				X[i] = new Array(N_PROBES);
-			}
-
-			for(var k = 0; k < N_PROBES; k++) {
-				var L_j = MC(v, verts.array, normals.array, probes[k].mesh);
-
-				// project to SH
-				//for(var m = 0; m < N_SAMPLES_SH; m++) {
-					for(var i = 0; i < N_COEFFS; i++) {
-						X[i][k] = L_j;// * basisSH[m][i];
-					}
-				//}
-			}
-
-			var yX = new Array(N_PROBES);
-			for(var k = 0; k < N_PROBES; k++) {
-				// y^ * X | (1 x nb) * (nb x nl) = dot(y^[i],X[i]) i->N_COEFFS
-				var value = 0.0;
-				for(var i = 0; i < N_COEFFS; i++) {
-					value += X[i][k];//basisSH[0][i] * X[i][k];
-				}
-				yX[k] = new THREE.Vector3(value,value,value); //todo: color
-			}
-
-			XObj[v] = {"X" : X, "yX" : yX, "Lr" : new THREE.Vector3(0,0,0)};
+			var X = computeX(v, verts, normals);
+			var yX = computeYX(v, verts, X);
+			XObj[v] = {
+				"X" : X,
+				"yX" : yX,
+				"Lr" : 0
+			};
 		}
 
 		PLRTCache.push(XObj);
 	}
 
 	console.log("[done]");
+}
+
+function computeX(v, verts, normals) {
+	// alloc X
+	var X = new Array(N_COEFFS);
+	for(var i = 0; i < N_COEFFS; i++) {
+		X[i] = new Array(N_PROBES);
+		for(var k = 0; k < N_PROBES; k++) {
+			X[i][k] = 0.0;
+		}
+	}
+
+	// compute X
+	for(var k = 0; k < N_PROBES; k++) {
+		var L_j = MC(v, verts, normals, probes[k].mesh);
+
+		X[0][k] = L_j;
+
+		// project to SH
+		/*for(var m = 0; m < N_SAMPLES_SH; m++) {
+			// sample direction
+			var sample = new THREE.Vector2(Math.random(), Math.random());
+			var w = squareToUniformSphere(sample);
+			var pdf = 1.0 / (4.0 * Math.PI);
+			var yi = SHEval(w.x, w.y, w.z, N_ORDER);
+			for(var i = 0; i < N_COEFFS; i++) {
+				X[i][k] += (L_j * yi[i]) / (pdf * N_SAMPLES_SH);
+			}
+		}*/
+	}
+
+	return X;
+}
+
+function computeYX(v, verts, X) {
+	var yX = new Array(N_PROBES);
+	for(var k = 0; k < N_PROBES; k++) {
+		/*var p = new THREE.Vector3(verts[v*3+0],verts[v*3+1],verts[v*3+2]);
+		var wo = new THREE.Vector3();
+		wo.subVectors(camera.position, p);
+		var yi = SHEval(wo.x, wo.y, wo.z, N_ORDER);
+
+		// y^ * X | (1 x nb) * (nb x nl) = dot(y^[i],X[i]) i->N_COEFFS
+		yX[k] = 0.0;
+		for(var i = 0; i < N_COEFFS; i++) {
+			yX[k] += yi[i] * X[i][k];
+		}*/
+		yX[k] = X[0][k];
+	}
+
+	return yX;
 }
 
 function buildBVH(objects) {
@@ -377,8 +477,8 @@ function buildBVH(objects) {
 		var verts = objects[i].geometry.getAttribute("position");
 		var normals = objects[i].geometry.getAttribute("normal");
 		var N_VERTS = verts.count;
-		var verts = verts.array;
-		var normals = normals.array;
+		verts = verts.array;
+		normals = normals.array;
 		for(var k = 0; k < N_VERTS*3; k+=3*3) {
 			var v0 = new THREE.Vector3(verts[k+0], verts[k+1], verts[k+2]);
 			var v1 = new THREE.Vector3(verts[k+3], verts[k+4], verts[k+5]);
@@ -534,7 +634,7 @@ function computeWeights() {
 		weights[i] = 0.0;
 
 		var rVec = new THREE.Vector3();
-		rVec.subVectors(probes[i].position,light.position)
+		rVec.subVectors(probes[i].position,light.position);
 
 		var dist = rVec.length();
 		if(dist > SEARCH_RADIUS) {
@@ -576,17 +676,16 @@ function computeVertexRadiance() {
 			var XObj = PLRTCache[i];
 			var yX = XObj[v].yX;
 			// yX * w | (1 x nl) * (nl x 1) = dot(yX,w)
-			var Lr = new THREE.Vector3(0,0,0);
+			var Lr = 0.0;
 			var nl = weights.length;
 			for(var k = 0; k < nl; k++) {
-				var tmp = yX[k].clone();
-				tmp.multiplyScalar(weights[k]);
-				Lr.add(tmp);
+				Lr += yX[k] * weights[k];
 			}
 
+			/*if(Lr < 0.0) Lr = 0.0;
+			if(Lr > 1.0) Lr = 1.0;*/
+
 			XObj[v].Lr = Lr;
-			//console.log(Lr);
-			//XObj[v].Lr = new THREE.Vector3(0,1,0);
 		}
 	}
 }
@@ -594,15 +693,14 @@ function computeVertexRadiance() {
 function updateVertex() {
 	for(var i = 0; i < objects.length; i++) {
 		var obj = objects[i];
+		var XObj = PLRTCache[i];
 		var verts = obj.geometry.getAttribute("mycolor");
-		for(var v = 0; v < verts.count; v++) {
-
-			var XObj = PLRTCache[i];
+		for(var v = 0; v < verts.count; v++) {	
 			var Lr = XObj[v].Lr;
 
-			verts.array[v*3+0] = Lr.x * cbox_colors[i].r/Math.PI;
-			verts.array[v*3+1] = Lr.y * cbox_colors[i].g/Math.PI;
-			verts.array[v*3+2] = Lr.z * cbox_colors[i].b/Math.PI;
+			verts.array[v*3+0] = Lr * cbox_colors[i].r/Math.PI;
+			verts.array[v*3+1] = Lr * cbox_colors[i].g/Math.PI;
+			verts.array[v*3+2] = Lr * cbox_colors[i].b/Math.PI;
 		}
 
 		verts.needsUpdate = true;
