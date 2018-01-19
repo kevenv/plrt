@@ -400,12 +400,12 @@ function computeProbes() {
 		var XObj = new Array(N_VERTS); // X matrix / vertex
 
 		for(var v = 0; v < N_VERTS; v++) {
-			var X = computeX(v, verts, normals);
+			var X = computeX(v, verts, normals, j);
 			var yX = computeYX(v, verts, X);
 			XObj[v] = {
 				"X" : X,
 				"yX" : yX,
-				"Lr" : 0
+				"Lr" : new THREE.Color(0,0,0)
 			};
 		}
 
@@ -415,33 +415,35 @@ function computeProbes() {
 	console.log("[done]");
 }
 
-function computeX(v, verts, normals) {
+function computeX(v, verts, normals, objectIdx) {
 	// alloc X
 	var X = new Array(N_COEFFS);
 	for(var i = 0; i < N_COEFFS; i++) {
 		X[i] = new Array(N_PROBES);
 		for(var k = 0; k < N_PROBES; k++) {
-			X[i][k] = 0.0;
+			X[i][k] = new THREE.Color(0,0,0);
 		}
 	}
 
 	// compute X
 	for(var k = 0; k < N_PROBES; k++) {
-		var L_j = MC(v, verts, normals, probes[k].mesh);
+		var L_j = MC(v, verts, normals, probes[k].mesh, objectIdx);
 
-		X[0][k] = L_j;
+		//X[0][k] = L_j;
 
 		// project to SH
-		/*for(var m = 0; m < N_SAMPLES_SH; m++) {
+		for(var m = 0; m < N_SAMPLES_SH; m++) {
 			// sample direction
 			var sample = new THREE.Vector2(Math.random(), Math.random());
 			var w = squareToUniformSphere(sample);
 			var pdf = 1.0 / (4.0 * Math.PI);
 			var yi = SHEval(w.x, w.y, w.z, N_ORDER);
 			for(var i = 0; i < N_COEFFS; i++) {
-				X[i][k] += (L_j * yi[i]) / (pdf * N_SAMPLES_SH);
+				X[i][k].r += (L_j.r * yi[i]) / (pdf * N_SAMPLES_SH);
+				X[i][k].g += (L_j.g * yi[i]) / (pdf * N_SAMPLES_SH);
+				X[i][k].b += (L_j.b * yi[i]) / (pdf * N_SAMPLES_SH);
 			}
-		}*/
+		}
 	}
 
 	return X;
@@ -450,17 +452,19 @@ function computeX(v, verts, normals) {
 function computeYX(v, verts, X) {
 	var yX = new Array(N_PROBES);
 	for(var k = 0; k < N_PROBES; k++) {
-		/*var p = new THREE.Vector3(verts[v*3+0],verts[v*3+1],verts[v*3+2]);
+		var p = new THREE.Vector3(verts[v*3+0],verts[v*3+1],verts[v*3+2]);
 		var wo = new THREE.Vector3();
 		wo.subVectors(camera.position, p);
 		var yi = SHEval(wo.x, wo.y, wo.z, N_ORDER);
 
 		// y^ * X | (1 x nb) * (nb x nl) = dot(y^[i],X[i]) i->N_COEFFS
-		yX[k] = 0.0;
+		yX[k] = new THREE.Color(0,0,0);
 		for(var i = 0; i < N_COEFFS; i++) {
-			yX[k] += yi[i] * X[i][k];
-		}*/
-		yX[k] = X[0][k];
+			yX[k].r += yi[i] * X[i][k].r;
+			yX[k].g += yi[i] * X[i][k].g;
+			yX[k].b += yi[i] * X[i][k].b;
+		}
+		//yX[k] = X[0][k];
 	}
 
 	return yX;
@@ -521,6 +525,7 @@ function hitRay(p,w) {
 		var objectIdx = triangleObjectMap[hitObjects[0].triangleIndex];
 		var obj = objects[objectIdx];
 		its.object = obj;
+		its.objectId = objectIdx;
 
 		// hit point
 		its.hitPt = hitObjects[0].intersectionPoint;
@@ -542,7 +547,7 @@ function squareToUniformSphere(sample) {
 	return new THREE.Vector3(r * Math.cos(phi), r * Math.sin(phi), z);
 }
 
-function MC(v, verts, normals, light) {
+function MC(v, verts, normals, light, objectIdx) {
 	var p = new THREE.Vector3(verts[v*3+0],verts[v*3+1],verts[v*3+2]);
 	var n = new THREE.Vector3(normals[v*3+0],normals[v*3+1],normals[v*3+2]);
 	// offset ray
@@ -550,11 +555,11 @@ function MC(v, verts, normals, light) {
 	n_.multiplyScalar(RAY_OFFSET);
 	p.add(n_);
 
-	var Lr = 0.0;
+	var Lr = new THREE.Color(0,0,0);
 	for(var i = 0; i < N_MONTE_CARLO; i++) {
-		Lr += path_tracer(p,{},n,light,0);
+		Lr.add(path_tracer(p,objectIdx,n,light,0));
 	}
-	Lr *= 1.0 / N_MONTE_CARLO;
+	Lr.multiplyScalar(1.0 / N_MONTE_CARLO);
 
 	return Lr;
 }
@@ -563,7 +568,7 @@ function path_tracer(woP, woD, n, light, bounces) {
 	var hit = hitRay(woP,woD);
 
 	if(bounces > 0 && !hit.value) {
-		return 0.0;
+		return new THREE.Color(0,0,0);
 	}
 	var x = woP;
 	if(bounces > 0) {
@@ -572,13 +577,18 @@ function path_tracer(woP, woD, n, light, bounces) {
 	}
 
 	if(bounces >= MONTE_CARLO_MAX_BOUNCES) {
-		return 0.0;
+		return new THREE.Color(0,0,0);
 	}
 
-	var Lr = 0.0;
+	var Lr = new THREE.Color(0,0,0);
 
 	//diffuse (constant added during shading)
-	var fr = 1.0;
+	var albedo = cbox_colors[hit.objectId];
+	if(bounces == 0) {
+		albedo = cbox_colors[woD]; //lol	
+	}
+	var fr = albedo.clone();
+	fr.multiplyScalar(1.0/Math.PI);
 
 	//direct
 	var wiDir = new THREE.Vector3();
@@ -590,19 +600,24 @@ function path_tracer(woP, woD, n, light, bounces) {
 	var cosTheta = Math.max(0.0, wiDir.dot(n));
 	if(V) {
 		var Le = 1.0;
-		Lr += fr * Le * cosTheta;
+		Lr.r += fr.r * Le * cosTheta;
+		Lr.g += fr.g * Le * cosTheta;
+		Lr.b += fr.b * Le * cosTheta;
 	}
 
 	//indirect
 	var sample = new THREE.Vector2(Math.random(), Math.random());
 	var wiInd = squareToUniformSphere(sample);
 	var pdf = 1.0 / (4.0 * Math.PI);
-	//wiInd.add(p);//to world space TODO:
+	// no need to convert to world space (uniform sphere sampling)
 	wiInd.normalize();
 
 	var cosTheta = Math.max(0.0, wiInd.dot(n));
 
-	Lr += (fr * path_tracer(x, wiInd, n, light, ++bounces) * cosTheta) / pdf;
+	var Lind = path_tracer(x, wiInd, n, light, ++bounces);
+	Lr.r += (fr.r * Lind.r * cosTheta) / pdf;
+	Lr.g += (fr.g * Lind.g * cosTheta) / pdf;
+	Lr.b += (fr.b * Lind.b * cosTheta) / pdf;
 
 	return Lr;
 }
@@ -676,10 +691,12 @@ function computeVertexRadiance() {
 			var XObj = PLRTCache[i];
 			var yX = XObj[v].yX;
 			// yX * w | (1 x nl) * (nl x 1) = dot(yX,w)
-			var Lr = 0.0;
+			var Lr = new THREE.Color(0,0,0);
 			var nl = weights.length;
 			for(var k = 0; k < nl; k++) {
-				Lr += yX[k] * weights[k];
+				Lr.r += yX[k].r * weights[k];
+				Lr.g += yX[k].g * weights[k];
+				Lr.b += yX[k].b * weights[k];
 			}
 
 			/*if(Lr < 0.0) Lr = 0.0;
@@ -698,9 +715,9 @@ function updateVertex() {
 		for(var v = 0; v < verts.count; v++) {	
 			var Lr = XObj[v].Lr;
 
-			verts.array[v*3+0] = Lr * cbox_colors[i].r/Math.PI;
-			verts.array[v*3+1] = Lr * cbox_colors[i].g/Math.PI;
-			verts.array[v*3+2] = Lr * cbox_colors[i].b/Math.PI;
+			verts.array[v*3+0] = Lr.r;
+			verts.array[v*3+1] = Lr.g;
+			verts.array[v*3+2] = Lr.b;
 		}
 
 		verts.needsUpdate = true;
