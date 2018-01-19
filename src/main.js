@@ -429,9 +429,10 @@ function computeX(v, verts, normals, objectIdx) {
 	for(var k = 0; k < N_PROBES; k++) {
 		var L_j = MC(v, verts, normals, probes[k].mesh, objectIdx);
 
-		//X[0][k] = L_j;
+		X[0][k] = L_j;
 
 		// project to SH
+		/*
 		for(var m = 0; m < N_SAMPLES_SH; m++) {
 			// sample direction
 			var sample = new THREE.Vector2(Math.random(), Math.random());
@@ -444,6 +445,7 @@ function computeX(v, verts, normals, objectIdx) {
 				X[i][k].b += (L_j.b * yi[i]) / (pdf * N_SAMPLES_SH);
 			}
 		}
+		*/
 	}
 
 	return X;
@@ -452,6 +454,7 @@ function computeX(v, verts, normals, objectIdx) {
 function computeYX(v, verts, X) {
 	var yX = new Array(N_PROBES);
 	for(var k = 0; k < N_PROBES; k++) {
+		/*
 		var p = new THREE.Vector3(verts[v*3+0],verts[v*3+1],verts[v*3+2]);
 		var wo = new THREE.Vector3();
 		wo.subVectors(camera.position, p);
@@ -464,7 +467,8 @@ function computeYX(v, verts, X) {
 			yX[k].g += yi[i] * X[i][k].g;
 			yX[k].b += yi[i] * X[i][k].b;
 		}
-		//yX[k] = X[0][k];
+		*/
+		yX[k] = X[0][k];
 	}
 
 	return yX;
