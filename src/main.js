@@ -17,7 +17,8 @@ var WINDOW_HEIGHT = 768/2;
 
 var LIGHT_POWER = 3.4;
 
-var N_PROBES = 4;
+var N_PROBES = 6;
+var PROBE_OFFSET = 0.05;
 var SEARCH_RADIUS = 0.8;
 
 var N_SH_ORDER = 3;
@@ -96,7 +97,7 @@ function initRenderer() {
 function onAfterMeshLoad() {
 	add3DAxis();
 	addLight();
-	addSearchRadius(light);
+	//addSearchRadius(light);
 	addProbes();
 	//addTestPlane();
 	//addTestProbe();
@@ -130,7 +131,9 @@ function moveLight() {
 	light.position.y = Math.sin( time * 0.7 ) * 0.6 + 0.1;
 	light.position.z = Math.sin( time * 0.8 ) * 0.4 + 0.9;
 
-	searchRadiusMesh.position.set(light.position.x,light.position.y,light.position.z);
+	if(searchRadiusMesh != null) {
+		searchRadiusMesh.position.set(light.position.x,light.position.y,light.position.z);
+	}
 
 	lightChanged = true;
 }
@@ -178,35 +181,35 @@ function addLight() {
 }
 
 function addProbes() {
-	var X_W = N_PROBES;
-	var Y_W = N_PROBES;
-	var Z_W = N_PROBES;
-	N_PROBES = X_W*Y_W*Z_W;
-	var PROBE_SPACING = 0.5;
-	var OFFSET_X = -0.8;
-	var OFFSET_Y = -0.8;
-	var OFFSET_Z = 0.2;
-	for(var x = 0; x < X_W; x++) {
-		for(var y = 0; y < Y_W; y++) {
-			for(var z = 0; z < Z_W; z++) {
-				addProbe(OFFSET_X+x*PROBE_SPACING, OFFSET_Y+y*PROBE_SPACING, OFFSET_Z+z*PROBE_SPACING);
+	var SCENE_WIDTH = 2.0;
+	var PROBE_SPACING = (SCENE_WIDTH-(2*PROBE_OFFSET)) / (N_PROBES-1);
+
+	for(var x = 0; x < N_PROBES; x++) {
+		for(var y = 0; y < N_PROBES; y++) {
+			for(var z = 0; z < N_PROBES; z++) {
+				var posX = PROBE_OFFSET + x*PROBE_SPACING - SCENE_WIDTH/2;
+				var posY = PROBE_OFFSET + y*PROBE_SPACING - SCENE_WIDTH/2;
+				var posZ = PROBE_OFFSET + z*PROBE_SPACING;
+
+				addProbe(posX,posY,posZ);
 			}
 		}
 	}
+
+	N_PROBES = N_PROBES*N_PROBES*N_PROBES;
 
 	weights = new Array(N_PROBES);
 }
 
 function addProbe(x,y,z) {
-	var geometry = new THREE.SphereGeometry(0.1, 16, 16);
-	var material = new THREE.MeshBasicMaterial( {color: 0x0000ff} );
-	var probe = new THREE.Mesh(geometry, material); //TODO: use same mesh&material for all probes
+	var geometry = new THREE.SphereGeometry(0.05, 16, 16);
+	var probe = new THREE.Mesh(geometry, probeMaterial);
 	probe.position.set(x,y,z);
 	probes.push({
 		"mesh": probe, 
 		"position": probe.position
 	});
-	scene.add(probe);
+	//scene.add(probe);
 }
 
 function addCbox() {
