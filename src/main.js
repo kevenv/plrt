@@ -263,7 +263,7 @@ function addCbox() {
 	scene.add(wallBack);
 
 	// BIG BOX
-	var bigBoxG = new THREE.BoxBufferGeometry(1, 1, 1, 2,2,2);
+	/*var bigBoxG = new THREE.BoxBufferGeometry(1, 1, 1, 2,2,2);
 	var bigbox = new THREE.Mesh(bigBoxG, basicShader);
 	bigbox.scale.z = 1.3;
 	bigbox.scale.x = 0.6;
@@ -274,18 +274,20 @@ function addCbox() {
 	bigbox.rotation.z = toRadians(25);
 	createColorAttrib(bigbox, new THREE.Vector3(1.0,1.0,1.0));
 	objects.push(bigbox);
-	scene.add(bigbox);
+	scene.add(bigbox);*/
 
 	// SMALL BOX
 	var smallBoxG = new THREE.BoxBufferGeometry(1, 1, 1, 2,2,2);
 	var smallbox = new THREE.Mesh(smallBoxG, basicShader);
-	smallbox.scale.z = 0.7;
+	/*smallbox.scale.z = 0.7;
 	smallbox.scale.x = 0.7;
 	smallbox.scale.y = 0.7;
 	smallbox.position.z = 0.7/2;
 	smallbox.position.y = -0.3;
 	smallbox.position.x = 0.4;
-	smallbox.rotation.z = toRadians(-20);
+	smallbox.rotation.z = toRadians(-20);*/
+	smallbox.scale.set(0.5,0.5,0.5);
+	smallbox.position.z = 2*0.5;
 	createColorAttrib(smallbox, new THREE.Vector3(1.0,1.0,1.0));
 	objects.push(smallbox);
 	scene.add(smallbox);
@@ -721,24 +723,41 @@ function buildBVH(objects) {
 
 function hitRay(p,w) {
 	var its = {};
+	its.value = false;
 
 	var hitObjects = bvh.intersectRay(p, w, true);
 	if(hitObjects.length != 0) {
 		its.value = true;
-		// find out what object was hit
-		//todo: sort hit objects
-		var objectIdx = triangleObjectMap[hitObjects[0].triangleIndex];
+		// find out what object was hit (find closest hit)
+		var closestHitIdx = 0;
+		if(hitObjects > 1) {
+			var closestHitDist = 99999;
+			for(var i = 0; i < hitObjects.length; i++) {
+				var obj = hitObjects[i];
+
+				var dVec = new THREE.Vector3();
+				dVec.subVectors(p, obj.intersectionPoint);
+				var d = dVec.length();
+				if(d < closestHitDist) {
+					closestHitDist = d;
+					closestHitIdx = i;
+				}
+			}
+		}
+		var hitObject = hitObjects[closestHitIdx];
+
+		var objectIdx = triangleObjectMap[hitObject.triangleIndex];
 		var obj = objects[objectIdx];
 		its.object = obj;
 		its.objectId = objectIdx;
 
 		// hit point
-		its.hitPt = hitObjects[0].intersectionPoint;
+		its.hitPt = hitObject.intersectionPoint;
 
 		// find out normal of hit point
 		// todo: vertex normal not face, what's the cloest vertex hit, take this normal?
 		var v = 0;
-		var n = trianglesNormal[hitObjects[0].triangleIndex][v];
+		var n = trianglesNormal[hitObject.triangleIndex][v];
 		its.hitNormal = n;
 	}
 
